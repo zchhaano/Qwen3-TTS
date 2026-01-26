@@ -25,3 +25,4 @@ env/
 Qwen/
 Qwen3/
 output_dialogue/
+flash_attn-2.7.0.post2+cu124torch2.5.1cxx11abiFALSE-cp312-cp312-win_amd64.whl
