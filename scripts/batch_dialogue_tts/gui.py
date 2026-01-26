@@ -1,12 +1,18 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import os
+import sys
 import threading
 from typing import Dict, List
-from .dialogue_parser import DialogueParser
-from .text_splitter import TextSplitter
-from .batch_synthesizer import BatchDialogueSynthesizer
-from .audio_merger import AudioMerger
+
+# Add parent directory to path for imports when running as script
+if __name__ == "__main__":
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from dialogue_parser import DialogueParser
+from text_splitter import TextSplitter
+from batch_synthesizer import BatchDialogueSynthesizer
+from audio_merger import AudioMerger
 
 class DialogueTTSGUI:
     def __init__(self, root):

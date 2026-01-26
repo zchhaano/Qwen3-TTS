@@ -22,7 +22,33 @@ class DialogueParser:
     def _load_json(self) -> Dict[str, Any]:
         """Load JSON format script."""
         with open(self.script_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            data = json.load(f)
+        
+        # Handle simple array format [{"text": "...", "speaker": "..."}]
+        if isinstance(data, list):
+            dialogues = data
+            roles = set()
+            
+            # Normalize 'speaker' to 'role' and collect roles
+            for dialogue in dialogues:
+                if 'speaker' in dialogue and 'role' not in dialogue:
+                    dialogue['role'] = dialogue.pop('speaker')
+                if 'role' in dialogue:
+                    roles.add(dialogue['role'])
+            
+            # Convert to full format
+            data = {
+                "metadata": {"title": "Imported from JSON", "default_language": "Chinese"},
+                "speakers": {role: {} for role in roles},
+                "dialogues": dialogues
+            }
+        # Handle full format with sections
+        elif 'dialogues' in data:
+            for dialogue in data['dialogues']:
+                if 'speaker' in dialogue and 'role' not in dialogue:
+                    dialogue['role'] = dialogue.pop('speaker')
+        
+        return data
 
     def _load_txt(self) -> Dict[str, Any]:
         """Load TXT format script (supports bracket and JSON-line formats)."""
@@ -145,9 +171,10 @@ class DialogueParser:
 
         dialogues = self.get_dialogues()
         for i, line in enumerate(dialogues):
-            role = line.get("role")
+            # Support both 'role' and 'speaker' keys
+            role = line.get("role") or line.get("speaker")
             if not role:
-                raise ValueError(f"Dialogue line {i} is missing 'role'.")
+                raise ValueError(f"Dialogue line {i} is missing 'role' or 'speaker'.")
             if role not in speakers:
                 raise ValueError(f"Dialogue line {i} refers to unknown role '{role}'.")
             if "text" not in line:
