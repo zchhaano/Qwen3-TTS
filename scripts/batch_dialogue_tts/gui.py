@@ -339,7 +339,13 @@ class DialogueTTSGUI:
                     silence_duration_ms=self.silence_var.get(),
                     chunk_silence_ms=self.chunk_silence_var.get()
                 )
-                output_name = metadata.get("title", "combined_dialogue").replace(" ", "_") + ".wav"
+                # Use input JSON filename as output name
+                script_path = self.script_path_var.get()
+                if script_path:
+                    input_filename = os.path.splitext(os.path.basename(script_path))[0]
+                    output_name = input_filename + ".wav"
+                else:
+                    output_name = metadata.get("title", "combined_dialogue").replace(" ", "_") + ".wav"
                 output_path = os.path.join(output_dir, output_name)
                 merger.merge(generated_files, output_path, dialogue_info=dialogue_info)
             
