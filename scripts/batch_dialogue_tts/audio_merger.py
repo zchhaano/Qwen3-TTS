@@ -1,14 +1,21 @@
 import os
 import soundfile as sf
 import numpy as np
-from typing import List
+from typing import List, Dict
 
 class AudioMerger:
-    def __init__(self, silence_duration_ms: int = 500):
+    def __init__(self, silence_duration_ms: int = 500, chunk_silence_ms: int = 100):
         self.silence_duration_ms = silence_duration_ms
+        self.chunk_silence_ms = chunk_silence_ms
 
-    def merge(self, audio_files: List[str], output_path: str):
-        """Merge multiple wav files into one with optional silence between them. Original files are NOT deleted."""
+    def merge(self, audio_files: List[str], output_path: str, dialogue_info: List[Dict] = None):
+        """Merge multiple wav files into one with optional silence between them. Original files are NOT deleted.
+        
+        Args:
+            audio_files: List of audio file paths
+            output_path: Output file path
+            dialogue_info: Optional list of dialogue metadata for each audio file to determine silence duration
+        """
         print(f"Merging {len(audio_files)} files into {output_path}...")
         
         combined_wav = []
@@ -29,10 +36,13 @@ class AudioMerger:
             combined_wav.append(wav)
             
             # Add silence between files (except after the last one)
-            if i < len(audio_files) - 1 and self.silence_duration_ms > 0:
-                silence_len = int(target_sr * self.silence_duration_ms / 1000)
-                silence = np.zeros(silence_len, dtype=wav.dtype)
-                combined_wav.append(silence)
+            if i < len(audio_files) - 1:
+                # Determine silence duration based on whether next segment is from same dialogue
+                silence_ms = self._get_silence_duration(i, dialogue_info)
+                if silence_ms > 0:
+                    silence_len = int(target_sr * silence_ms / 1000)
+                    silence = np.zeros(silence_len, dtype=wav.dtype)
+                    combined_wav.append(silence)
 
         if combined_wav:
             final_wav = np.concatenate(combined_wav)
@@ -40,3 +50,20 @@ class AudioMerger:
             print(f"Merged audio saved to {output_path}. Intermediate files remain in the output directory.")
         else:
             print("No audio files to merge.")
+    
+    def _get_silence_duration(self, current_idx: int, dialogue_info: List[Dict] = None) -> int:
+        """Determine silence duration between current and next audio segment."""
+        if not dialogue_info or current_idx >= len(dialogue_info) - 1:
+            return self.silence_duration_ms
+        
+        current = dialogue_info[current_idx]
+        next_item = dialogue_info[current_idx + 1]
+        
+        # Check if both are segments of the same original dialogue line
+        if (current.get('is_segment') and next_item.get('is_segment') and
+            current.get('original_line_idx') == next_item.get('original_line_idx')):
+            # Same dialogue, use shorter chunk silence
+            return self.chunk_silence_ms
+        else:
+            # Different dialogues, use longer silence
+            return self.silence_duration_ms

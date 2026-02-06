@@ -6,6 +6,8 @@ class TextSplitter:
         self.max_chars = max_chars
         # Sentence boundary markers for various languages
         self.boundary_pattern = re.compile(r'([。！？！？.!?]+)')
+        # Secondary boundaries (commas, semicolons, etc.) - lower priority
+        self.secondary_boundary_pattern = re.compile(r'([，,；;、]+)')
 
     def split_text(self, text: str) -> List[str]:
         if len(text) <= self.max_chars:
@@ -32,9 +34,17 @@ class TextSplitter:
                 if current_chunk:
                     chunks.append(current_chunk)
                 
-                # If a single sentence is still too long, split by word boundaries
+                # If a single sentence is still too long, try secondary boundaries first
                 if len(s) > self.max_chars:
-                    chunks.extend(self._split_by_words(s))
+                    sub_chunks = self._split_by_secondary_boundaries(s)
+                    # If still too long, split by words as last resort
+                    final_chunks = []
+                    for sub in sub_chunks:
+                        if len(sub) > self.max_chars:
+                            final_chunks.extend(self._split_by_words(sub))
+                        else:
+                            final_chunks.append(sub)
+                    chunks.extend(final_chunks)
                     current_chunk = ""
                 else:
                     current_chunk = s
@@ -44,6 +54,38 @@ class TextSplitter:
             
         return chunks
 
+    def _split_by_secondary_boundaries(self, text: str) -> List[str]:
+        """Split by secondary boundaries like commas and semicolons."""
+        if len(text) <= self.max_chars:
+            return [text]
+        
+        parts = self.secondary_boundary_pattern.split(text)
+        
+        # Re-combine parts with their punctuation
+        segments = []
+        for i in range(0, len(parts), 2):
+            segment = parts[i]
+            if i + 1 < len(parts):
+                segment += parts[i+1]
+            if segment.strip():
+                segments.append(segment)
+        
+        # Combine segments into chunks
+        chunks = []
+        current_chunk = ""
+        for seg in segments:
+            if len(current_chunk) + len(seg) <= self.max_chars:
+                current_chunk += seg
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk)
+                current_chunk = seg
+        
+        if current_chunk:
+            chunks.append(current_chunk)
+        
+        return chunks if chunks else [text]
+    
     def _split_by_words(self, text: str) -> List[str]:
         """Split long text by word boundaries to avoid cutting words in the middle."""
         chunks = []
@@ -84,7 +126,7 @@ class TextSplitter:
 
     def process_dialogues(self, dialogues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         processed = []
-        for line in dialogues:
+        for line_idx, line in enumerate(dialogues):
             text = line["text"]
             if len(text) > self.max_chars:
                 chunks = self.split_text(text)
@@ -93,7 +135,11 @@ class TextSplitter:
                     new_line["text"] = chunk
                     new_line["is_segment"] = True
                     new_line["segment_idx"] = i
+                    new_line["total_segments"] = len(chunks)
+                    new_line["original_line_idx"] = line_idx
                     processed.append(new_line)
             else:
-                processed.append(line)
+                new_line = line.copy()
+                new_line["original_line_idx"] = line_idx
+                processed.append(new_line)
         return processed

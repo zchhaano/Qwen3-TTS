@@ -40,10 +40,15 @@ class BatchDialogueSynthesizer:
         dialogues: List[Dict[str, Any]], 
         output_dir: str,
         default_lang: str = "Chinese"
-    ) -> List[str]:
-        """Synthesize each dialogue line and save to wav files. Intermediate segments are preserved."""
+    ) -> Tuple[List[str], List[Dict[str, Any]]]:
+        """Synthesize each dialogue line and save to wav files. Intermediate segments are preserved.
+        
+        Returns:
+            Tuple of (generated_files, dialogue_info) where dialogue_info contains metadata for each file
+        """
         os.makedirs(output_dir, exist_ok=True)
         generated_files = []
+        dialogue_info = []
 
         for i, line in enumerate(dialogues):
             role = line["role"]
@@ -76,7 +81,8 @@ class BatchDialogueSynthesizer:
                 output_path = os.path.join(output_dir, filename)
                 sf.write(output_path, wavs[0], sr)
                 generated_files.append(output_path)
+                dialogue_info.append(line)  # Store dialogue metadata
             except Exception as e:
                 print(f"Error synthesizing line {i}: {e}")
         
-        return generated_files
+        return generated_files, dialogue_info

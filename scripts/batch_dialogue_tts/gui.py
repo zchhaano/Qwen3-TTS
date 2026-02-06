@@ -73,13 +73,17 @@ class DialogueTTSGUI:
         self.merge_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(output_frame, text="合并为单个文件", variable=self.merge_var).grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=5)
         
-        ttk.Label(output_frame, text="静音间隔(ms):").grid(row=2, column=0, sticky=tk.W)
+        ttk.Label(output_frame, text="对话间隔(ms):").grid(row=2, column=0, sticky=tk.W)
         self.silence_var = tk.IntVar(value=500)
         ttk.Spinbox(output_frame, from_=0, to=5000, textvariable=self.silence_var, width=10).grid(row=2, column=1, sticky=tk.W, padx=5)
         
-        ttk.Label(output_frame, text="文本拆分长度:").grid(row=3, column=0, sticky=tk.W)
+        ttk.Label(output_frame, text="句子间隔(ms):").grid(row=3, column=0, sticky=tk.W)
+        self.chunk_silence_var = tk.IntVar(value=100)
+        ttk.Spinbox(output_frame, from_=0, to=2000, textvariable=self.chunk_silence_var, width=10).grid(row=3, column=1, sticky=tk.W, padx=5)
+        
+        ttk.Label(output_frame, text="文本拆分长度:").grid(row=4, column=0, sticky=tk.W)
         self.max_chars_var = tk.IntVar(value=100)
-        ttk.Spinbox(output_frame, from_=50, to=1000, textvariable=self.max_chars_var, width=10).grid(row=3, column=1, sticky=tk.W, padx=5)
+        ttk.Spinbox(output_frame, from_=50, to=1000, textvariable=self.max_chars_var, width=10).grid(row=4, column=1, sticky=tk.W, padx=5)
         
         # 4. Model Settings Section
         model_frame = ttk.LabelFrame(main_frame, text="4. 模型设置", padding="10")
@@ -320,7 +324,7 @@ class DialogueTTSGUI:
             output_dir = self.output_dir_var.get()
             metadata = self.parser.get_metadata()
             
-            generated_files = synthesizer.synthesize(
+            generated_files, dialogue_info = synthesizer.synthesize(
                 processed_dialogues,
                 output_dir,
                 default_lang=metadata.get("default_language", "Chinese")
@@ -331,10 +335,13 @@ class DialogueTTSGUI:
             # Merge if requested
             if self.merge_var.get() and generated_files:
                 self._log("合并音频文件...")
-                merger = AudioMerger(silence_duration_ms=self.silence_var.get())
+                merger = AudioMerger(
+                    silence_duration_ms=self.silence_var.get(),
+                    chunk_silence_ms=self.chunk_silence_var.get()
+                )
                 output_name = metadata.get("title", "combined_dialogue").replace(" ", "_") + ".wav"
                 output_path = os.path.join(output_dir, output_name)
-                merger.merge(generated_files, output_path)
+                merger.merge(generated_files, output_path, dialogue_info=dialogue_info)
             
             self.progress_var.set(100)
             self._log(f"\n✓ 合成完成! 输出目录: {os.path.abspath(output_dir)}")
